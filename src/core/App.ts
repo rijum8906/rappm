@@ -1,38 +1,49 @@
-import { type Template } from "./Template";
-import { type Feature } from "./Feature";
-import path from "path";
+import { type Template } from './Template';
+import { type FileEditor } from './FileEditor';
+import { type Feature } from './Feature';
+import path from 'path';
 
 export class App {
   private name: string;
   private description: string;
-  private projectPath: string;
+  private appDir: string;
   private template!: Template;
-  private features: Feature[] = [];
+  private editor: FileEditor;
 
   constructor(name: string, description: string) {
     this.name = name;
     this.description = description;
-    this.projectPath = path.join(process.cwd(), name);
+    this.appDir = path.join(process.cwd(), name);
   }
 
   setTemplate(template: Template): void {
     this.template = template;
   }
 
+  setEditor(editor: FileEditor): void {
+    this.editor = editor;
+  }
+
   async create(): Promise<void> {
     if (!this.template) {
-      throw new Error("Template is not set");
+      throw new Error('Template is not set');
     }
 
-    await this.template.generate(this.name, this.projectPath);
+    await this.template.generate(this.name, this.appDir);
+    console.log(`✅ Project "${this.name}" created successfully!`);
   }
 
   async addFeature(feature: Feature): Promise<void> {
-    this.features.push(feature);
-    await feature.install(this.projectPath);
+    feature.setEditor(this.editor);
+    await feature.install(this.appDir);
+    console.log(`✅ "${feature.getKey()}" feature successfully added`);
   }
 
   getProjectPath(): string {
-    return this.projectPath;
+    return this.appDir;
+  }
+
+  resolvePath(file: string) {
+    return path.resolve(this.appDir, file);
   }
 }

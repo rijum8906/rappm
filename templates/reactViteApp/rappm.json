@@ -1,0 +1,5 @@
+{
+  "projectName": "$project_name",
+  "templateKey": "$template_key",
+  "projectPath": "$project_path"
+}

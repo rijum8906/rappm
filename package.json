@@ -3,13 +3,13 @@
   "version": "1.0.0",
   "type": "module",
   "bin": {
-    "rappm": "./dist/bin/index.js"
+    "rappm": "./dist/index.js"
   },
   "scripts": {
-    "build": "tsup",
-    "dev": "tsup --watch",
+    "build": "npx tsup",
+    "dev": "npx tsup --watch",
     "clean": "rm -rf dist",
-    "format": "prettier --write \"src/**/*.{ts,tsx}\"",
+    "format": "prettier --write \"src/**/*.{ts,.js}\"",
     "prepare": "npm run build"
   },
   "description": "A modular CLI tool for scaffolding modern apps with features, templates, and configuration injection.",
@@ -55,7 +55,6 @@
     "@types/fs-extra": "^11.0.4",
     "@types/inquirer": "^9.0.8",
     "@types/node": "^20.11.30",
-    "esbuild": "^0.25.8",
     "tsup": "^8.5.0",
     "typescript": "^5.3.3"
   }

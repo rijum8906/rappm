@@ -1,73 +1,79 @@
-import type { FeatureConfig } from "./../core/types";
-import path from "path";
-import { fileURLToPath } from "url";
-import { materialTailwindPalette } from "./material-tailwind-palette";
+import type { FeatureConfig } from './../core/types';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { materialTailwindPalette } from './material-tailwind-palette';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 export const features: FeatureConfig[] = [
   {
-    name: "Eruda Console",
-    description:
-      "A console for mobile browsers, useful for debugging on mobile devices.",
-    key: "eruda",
-    dependencies: ["eruda"],
+    name: 'Eruda Console',
+    description: 'A console for mobile browsers, useful for debugging on mobile devices.',
+    key: 'eruda',
+    dependencies: [],
+    devDependencies: [],
     fileOperations: [
       {
-        type: "inject",
-        file: "index.html",
-        content:
-          '<script defer src="js/eruda.js"></script>\n<script>eruda.init()</script>',
+        type: 'inject',
+        files: ['index.html'],
+        content: '<script defer src="js/eruda.js"></script>\n<script defer src="js/console.js"></script>',
         marker: /<!--\s*CLI_SCRIPTS\s*-->/,
         options: {
           format: true,
         },
       },
       {
-        type: "copy",
-        file: "public/js/eruda.js",
-        source: path.resolve(__dirname, "../features/eruda/eruda.js"),
+        type: 'copy',
+        file: 'public/js/eruda.js',
+        source: path.resolve(__dirname, '../features/eruda/eruda.js'),
+      },
+      {
+        type: 'create',
+        file: 'public/js/console.js',
+        content: 'eruda.init();',
       },
     ],
   },
   {
-    name: "Tailwind CSS",
-    description: "Integrate Tailwind CSS for utility-first styling.",
-    key: "tailwind",
-    dependencies: ["tailwindcss", "postcss", "autoprefixer"],
+    name: 'Tailwind CSS',
+    description: 'Integrate Tailwind CSS for utility-first styling.',
+    key: 'tailwindcss',
+    dependencies: ['tailwindcss@3.4.17'],
+    devDependencies: [],
     fileOperations: [
       {
-        type: "copy",
-        file: "tailwind.config.js",
-        source: "./features/tailwind/tailwind.config.js",
+        type: 'copy',
+        file: 'tailwind.config.js',
+        source: path.resolve(__dirname, '../features/tailwind/tailwind.config.js'),
       },
       {
-        type: "create",
-        file: "src/index.css",
-        content: "@tailwind base;\n@tailwind components;\n@tailwind utilities;",
+        type: 'create',
+        file: 'src/index.css',
+        content: '@tailwind base;\n@tailwind components;\n@tailwind utilities;',
       },
     ],
   },
   {
-    name: "Material You",
-    description: "",
-    key: "material-you",
-    dependencies: [""],
+    name: 'Material You',
+    description: '',
+    key: 'material-you',
+    dependencies: ['@material/web'],
+    devDependencies: [],
     fileOperations: [
       {
-        type: "copy",
-        file: "src/assets/css/dark.css",
-        source: "./features/material-you/dark.css",
+        type: 'copy',
+        file: 'src/assets/css/dark.css',
+        source: path.resolve(__dirname, '../features/material-you/dark.css'),
       },
       {
-        type: "copy",
-        file: "src/assets/css/light.css",
-        source: "./features/material-you/light.css",
+        type: 'copy',
+        file: 'src/assets/css/light.css',
+        source: path.resolve(__dirname, '../features/material-you/light.css'),
       },
       {
-        type: "inject",
-        file: "tailwind.config.js",
+        type: 'inject',
+        files: ['tailwind.config.js'],
         marker: /\/\*\s*CLI_INJECT_TAILWIND\s*\*\//,
         content: materialTailwindPalette,
         options: {
@@ -75,17 +81,62 @@ export const features: FeatureConfig[] = [
         },
       },
       {
-        type: "inject",
-        file: "src/main.tsx",
+        type: 'inject',
+        files: ['src/main.tsx'],
         marker: /\/\*\s*CLI_INJECT_IMPORTS\s*\*\//,
-        content: `import 'assets/light.css';\nimport 'assets/css/dark.css';`,
+        content: `import 'assets/css/light.css';\nimport 'assets/css/dark.css';`,
+        position: 'before',
         options: {
           format: true,
         },
       },
     ],
   },
+  {
+    name: 'Redux Toolkit + Persist',
+    description: 'Adds Redux Toolkit and Redux Persist setup for state management.',
+    key: 'redux-persist',
+    dependencies: ['@reduxjs/toolkit', 'react-redux', 'redux-persist'],
+    devDependencies: [],
+    fileOperations: [
+      {
+        type: 'copy',
+        file: 'src/features/counter/counterSlice.ts',
+        source: path.resolve(__dirname, '../features/redux-persist/counterSlice.ts'),
+      },
+      {
+        type: 'copy',
+        file: 'src/store/index.ts',
+        source: path.resolve(__dirname, '../features/redux-persist/index.ts'),
+      },
+      {
+        type: 'inject',
+        files: ['src/main.tsx'],
+        marker: /\/\*\s*CLI_INJECT_IMPORTS\s*\*\//,
+        content:
+          "import { Provider } from 'react-redux';\nimport { PersistGate } from 'redux-persist/integration/react';\nimport { store, persistor } from './store';",
+        position: 'before',
+        options: {
+          format: true,
+        },
+      },
+      {
+        type: 'replace',
+        files: ['src/main.tsx'],
+        search: /\.render\(\s*([\s\S]+?)\s*\)/,
+        replacer: (match: string, content: string): string => {
+          return `.render(
+  <PersistGate loading={null} persistor={persistor}>
+    <Provider store={store}>
+      ${content}
+    </Provider>
+  </PersistGate>
+)`;
+        },
+      },
+    ],
+  },
 ];
 
-export const Features = ["tailwind", "eruda", "material-you"] as const;
+export const Features = ['tailwindcss', 'eruda', 'material-you', 'redux-persist'] as const;
 export type FeatureKey = (typeof Features)[number];

@@ -1,7 +1,7 @@
-import fs from "fs-extra";
-import path from "path";
-import type { FileOptions } from "./types";
-import { formatCode, getParserFromExtension } from "./../utils/files";
+import fs from 'fs-extra';
+import path from 'path';
+import type { FileOptions } from './types';
+import { formatCode, getParserFromExtension } from './../utils/files';
 
 /**
  * Payload for creating a file with content.
@@ -15,18 +15,19 @@ interface CreateFilePayload {
  * Payload for injecting content at a marker.
  */
 interface InjectFilePayload {
-  file: string;
+  files: string[];
   content: string;
   marker: string | RegExp;
+  position?: 'before' | 'after';
 }
 
 /**
  * Payload for replacing content in a file.
  */
 interface ReplaceFilePayload {
-  file: string;
+  files: string[];
   search?: string | RegExp;
-  replacer: string | ((match: string) => string);
+  replacer: string | ((match: string, content: string) => string);
 }
 
 /**
@@ -34,13 +35,13 @@ interface ReplaceFilePayload {
  */
 export class FileEditor {
   /** Absolute path to the root of the project */
-  private projectDir: string;
+  private appDir: string;
 
   /**
-   * @param projectDir - The root directory of the target project.
+   * @param appDir - The root directory of the target project.
    */
-  constructor(projectDir: string) {
-    this.projectDir = projectDir;
+  constructor(appDir: string) {
+    this.appDir = appDir;
   }
 
   /**
@@ -48,11 +49,8 @@ export class FileEditor {
    * @param payload - Contains file path and file content.
    * @param options - Optional formatting options.
    */
-  async createFile(
-    { file, content }: CreateFilePayload,
-    options?: FileOptions,
-  ): Promise<void> {
-    const destPath = path.join(this.projectDir, file);
+  async createFile({ file, content }: CreateFilePayload, options?: FileOptions): Promise<void> {
+    const destPath = path.join(this.appDir, file);
     let finalContent = content;
 
     if (options?.format) {
@@ -69,7 +67,7 @@ export class FileEditor {
    * @param dest - Destination path within the project.
    */
   async copyFile(source: string, dest: string): Promise<void> {
-    const destPath = path.join(this.projectDir, dest);
+    const destPath = path.join(this.appDir, dest);
     const content = await fs.readFile(source);
     await fs.outputFile(destPath, content);
   }
@@ -81,39 +79,46 @@ export class FileEditor {
    * @throws If file or marker is not found.
    */
   async injectContent(
-    { file, content, marker }: InjectFilePayload,
-    options?: FileOptions,
+    { files, content, marker, position = 'after' }: InjectFilePayload,
+    options?: FileOptions
   ): Promise<void> {
-    const filePath = path.join(this.projectDir, file);
+    for (var file of files) {
+      const filePath = path.join(this.appDir, file);
 
-    if (!(await fs.pathExists(filePath))) {
-      throw new Error(`File not found: ${filePath}`);
-    }
-
-    let original = await fs.readFile(filePath, "utf-8");
-    let updated: string;
-
-    if (marker instanceof RegExp) {
-      if (!marker.test(original)) {
-        throw new Error(`Regex marker not found in ${file}`);
+      if (!(await fs.pathExists(filePath))) {
+        throw new Error(`File not found: ${filePath}`);
       }
 
-      updated = original.replace(marker, (match) => match + content);
-    } else {
-      const index = original.indexOf(marker);
-      if (index === -1) {
-        throw new Error(`Marker "${marker}" not found in ${file}`);
+      let original = await fs.readFile(filePath, 'utf-8');
+      let updated: string;
+
+      if (marker instanceof RegExp) {
+        if (!marker.test(original)) {
+          throw new Error(`Regex marker not found in ${file}`);
+        }
+
+        updated = original.replace(marker, (match) =>
+          position === 'before' ? `${content}\n${match}` : `${match}\n${content}`
+        );
+      } else {
+        const index = original.indexOf(marker);
+        if (index === -1) {
+          throw new Error(`Marker "${marker}" not found in ${file}`);
+        }
+
+        updated =
+          position === 'before'
+            ? original.replace(marker, `${content}\n${marker}`)
+            : original.replace(marker, `${marker}\n${content}`);
       }
 
-      updated = original.replace(marker, marker + `\n${content}`);
-    }
+      if (options?.format) {
+        const ext = getParserFromExtension(file);
+        updated = await formatCode(updated, ext);
+      }
 
-    if (options?.format) {
-      const ext = getParserFromExtension(file);
-      updated = await formatCode(updated, ext);
+      await fs.outputFile(filePath, updated, 'utf-8');
     }
-
-    await fs.outputFile(filePath, updated, "utf-8");
   }
 
   /**
@@ -122,30 +127,29 @@ export class FileEditor {
    * @param options - Optional formatting options.
    * @throws If file is not found.
    */
-  async replaceContent(
-    { file, search, replacer }: ReplaceFilePayload,
-    options?: FileOptions,
-  ): Promise<void> {
-    const filePath = path.resolve(this.projectDir, file);
+  async replaceContent({ files, search, replacer }: ReplaceFilePayload, options?: FileOptions): Promise<void> {
+    for (var file of files) {
+      const filePath = path.resolve(this.appDir, file);
 
-    if (!(await fs.pathExists(filePath))) {
-      throw new Error(`File not found: ${filePath}`);
+      if (!(await fs.pathExists(filePath))) {
+        throw new Error(`File not found: ${filePath}`);
+      }
+
+      let content = await fs.readFile(filePath, 'utf-8');
+      let updated: string;
+
+      if (search) {
+        updated = content.replace(search, replacer as any);
+      } else {
+        updated = (replacer as Function)(content);
+      }
+
+      if (options?.format) {
+        const ext = getParserFromExtension(file);
+        updated = await formatCode(updated, ext);
+      }
+
+      await fs.outputFile(filePath, updated, 'utf-8');
     }
-
-    let content = await fs.readFile(filePath, "utf-8");
-    let updated: string;
-
-    if (search) {
-      updated = content.replace(search, replacer as any);
-    } else {
-      updated = (replacer as Function)(content);
-    }
-
-    if (options?.format) {
-      const ext = getParserFromExtension(file);
-      updated = await formatCode(updated, ext);
-    }
-
-    await fs.outputFile(filePath, updated, "utf-8");
   }
 }
